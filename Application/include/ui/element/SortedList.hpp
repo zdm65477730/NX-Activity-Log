@@ -30,6 +30,12 @@ namespace CustomElm {
             SortType sorting;
 
         public:
+            /**
+             * @brief Add an element to the list
+             * @param e Element to add
+             */
+            void addElement(Element * e) override;
+
             // X, Y, W, H
             SortedList(int, int, int, int);
 

@@ -1,6 +1,8 @@
 #ifndef PLAYDATA_HPP
 #define PLAYDATA_HPP
 
+#include <atomic>
+#include <thread>
 #include "nx/Title.hpp"
 #include "Types.hpp"
 #include <vector>
@@ -87,6 +89,12 @@ namespace NX {
             // Used to "merge" with system stats
             uint64_t importTimestamp;
 
+            // Flag indicating if initialization is complete
+            std::atomic<bool> initialized;
+
+            // Thread for asynchronous initialization
+            std::thread initThread;
+
             // Return vector of PD_Sessions for given title/user IDs + time range
             // Give a titleID of zero to include all titles
             std::vector<PD_Session> getPDSessions(TitleID, AccountUid, u64, u64);
@@ -104,9 +112,20 @@ namespace NX {
             // Merges the data within the two passed vectors by only keeping unique PlayEvents
             std::vector<PlayEvent *> mergePlayEvents(std::vector<PlayEvent *> &, std::vector<PlayEvent *> &);
 
+            // Asynchronously initialize play data
+            void initializeAsync();
+
         public:
             // The constructor prepares + creates PlayEvents
             PlayData();
+
+            // Check if initialization is complete
+            bool isInitialized();
+
+            void setInitialized(bool initialized);
+
+            // Wait for initialization to complete
+            void waitForInitialization();
 
             // Returns title objects that are not present in the given vector
             std::vector<Title *> getMissingTitles(std::vector<Title *>);

@@ -170,6 +170,9 @@ namespace Main {
             // Set active title given index
             void setActiveTitle(unsigned int);
 
+            // Notify screens that title data has been updated
+            void notifyTitleDataUpdated();
+
             // Imports play data from a JSON (by matching usernames).
             // This operation is performed an it's own thread, updating the provided atomic.
             void importFromJSON(std::atomic<double> & percent);

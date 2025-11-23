@@ -10,6 +10,10 @@ namespace CustomElm {
         List::addElement(new Aether::ListSeparator(20));
     }
 
+    void SortedList::addElement(Element * e) {
+        List::addElement(e);
+    }
+
     void SortedList::addElement(ListActivity * e, SortInfo * i) {
         List::addElement(e);
         this->sortinfo.push_back(i);

@@ -379,23 +379,38 @@ namespace NX {
         return merged;
     }
 
-    PlayData::PlayData() {
-        // Read in all data simultaneously
-        std::future<PlayEventsAndSummaries> pdmThread = std::async(std::launch::async, [this]() -> PlayEventsAndSummaries {
-            return this->readPlayDataFromPdm();
-        });
-        std::future<PlayEventsAndSummaries> impThread = std::async(std::launch::async, [this]() -> PlayEventsAndSummaries {
-            return this->readPlayDataFromImport();
-        });
+    PlayData::PlayData() : initialized(false) {
+        // Start async initialization
+        this->initThread = std::thread(&PlayData::initializeAsync, this);
+    }
 
-        PlayEventsAndSummaries pdmData = pdmThread.get();
-        PlayEventsAndSummaries impData = impThread.get();
+    void PlayData::initializeAsync() {
+        // Read in all data synchronously in this thread
+        PlayEventsAndSummaries pdmData = this->readPlayDataFromPdm();
+        PlayEventsAndSummaries impData = this->readPlayDataFromImport();
 
         this->events = this->mergePlayEvents(pdmData.first, impData.first);
         this->summaries = impData.second;
     }
 
+    bool PlayData::isInitialized() {
+        return this->initialized.load();
+    }
+
+    void PlayData::setInitialized(bool initialized) {
+        this->initialized = initialized;
+    }
+
+    void PlayData::waitForInitialization() {
+        if (this->initThread.joinable()) {
+            this->initThread.join();
+        }
+    }
+
     std::vector<Title *> PlayData::getMissingTitles(std::vector<Title *> passed) {
+        // Wait for initialization before accessing data
+        this->waitForInitialization();
+        
         // Iterate over events and summaries, creating title objects for
         // titles not present in passed vector
         std::vector <Title *> missing;

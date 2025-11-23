@@ -83,40 +83,7 @@ namespace Screen {
         this->app->addOverlay(this->sortOverlay);
     }
 
-    void AllActivity::onLoad() {
-        // Create heading using user's name
-        this->heading = new Aether::Text(150, 45, Utils::formatHeading(this->app->activeUser()->username()), 28);
-        this->heading->setY(this->heading->y() - this->heading->h()/2);
-        this->heading->setColour(this->app->theme()->text());
-        this->addElement(this->heading);
-
-        // Render user's image
-        this->image = new Aether::Image(65, 14, this->app->activeUser()->imgPtr(), this->app->activeUser()->imgSize(), Aether::Render::Wait);
-        this->image->setScaleDimensions(60, 60);
-        this->image->renderSync();
-        this->addElement(this->image);
-
-        // Create side menu
-        this->menu = new Aether::Menu(30, 88, 388, 559);
-        this->menu->addElement(new Aether::MenuOption("common.screen.recentActivity"_lang, this->app->theme()->accent(), this->app->theme()->text(), [this](){
-            this->app->setScreen(ScreenID::RecentActivity);
-        }));
-        Aether::MenuOption * opt = new Aether::MenuOption("common.screen.allActivity"_lang, this->app->theme()->accent(), this->app->theme()->text(), nullptr);
-        this->menu->addElement(opt);
-        this->menu->setActiveOption(opt);
-        this->menu->addElement(new Aether::MenuSeparator(this->app->theme()->mutedLine()));
-        this->menu->addElement(new Aether::MenuOption("common.screen.settings"_lang, this->app->theme()->accent(), this->app->theme()->text(), [this](){
-            this->app->setScreen(ScreenID::Settings);
-        }));
-        this->menu->setFocussed(opt);
-        this->addElement(this->menu);
-
-        // Create list
-        this->list = new CustomElm::SortedList(420, 88, 810, 559);
-        this->list->setCatchup(11);
-        this->list->setHeadingColour(this->app->theme()->mutedText());
-        this->list->setScrollBarColour(this->app->theme()->mutedLine());
-
+    void AllActivity::updateActivity() {
         // Populate list + count total time
         std::vector<AdjustmentValue> adjustments = this->app->config()->adjustmentValues();
         std::vector<NX::Title *> t = this->app->titleVector();
@@ -188,16 +155,79 @@ namespace Screen {
         this->list->setSort(this->app->config()->lSort());
         this->addElement(this->list);
 
-        // Render total hours string
-        this->hours = new Aether::Text(1215, 44, Utils::playtimeToTotalPlaytimeString(totalSecs), 20);
-        this->hours->setXY(this->hours->x() - this->hours->w(), this->hours->y() - this->hours->h()/2);
+        // Update total hours string
+        this->hours->setString(Utils::playtimeToTotalPlaytimeString(totalSecs));
+
+        // Show update icon if needbe
+        if (this->updateElm == nullptr && this->app->hasUpdate()) {
+            this->updateElm = new Aether::Image(50, 669, "romfs:/icon/download.png");
+                static_cast<Aether::Texture*>(this->updateElm)->setColour(this->app->theme()->text());
+                this->addElement(this->updateElm);
+        }
+    }
+
+    void AllActivity::update(uint32_t dt) {
+        // Check if play data is initialized and update UI accordingly
+        if (this->app->timeChanged() || this->app->playdata()->isInitialized()) {
+            this->updateActivity();
+            // Reset the hours text color in case it was changed during loading
+            this->hours->setColour(this->app->theme()->mutedText());
+        } else {
+            // Data still loading, keep showing loading state
+            this->hours->setString("common.loading"_lang);
+            this->hours->setColour(this->app->theme()->mutedText());
+        }
+        
+        Screen::update(dt);
+    }
+
+    void AllActivity::onLoad() {
+        // Create heading using user's name
+        this->heading = new Aether::Text(150, 45, Utils::formatHeading(this->app->activeUser()->username()), 28);
+        this->heading->setY(this->heading->y() - this->heading->h()/2);
+        this->heading->setColour(this->app->theme()->text());
+        this->addElement(this->heading);
+
+        // Render user's image
+        this->image = new Aether::Image(65, 14, this->app->activeUser()->imgPtr(), this->app->activeUser()->imgSize(), Aether::Render::Wait);
+        this->image->setScaleDimensions(60, 60);
+        this->image->renderSync();
+        this->addElement(this->image);
+
+        // Create side menu
+        this->menu = new Aether::Menu(30, 88, 388, 559);
+        this->menu->addElement(new Aether::MenuOption("common.screen.recentActivity"_lang, this->app->theme()->accent(), this->app->theme()->text(), [this](){
+            this->app->setScreen(ScreenID::RecentActivity);
+        }));
+        Aether::MenuOption * opt = new Aether::MenuOption("common.screen.allActivity"_lang, this->app->theme()->accent(), this->app->theme()->text(), nullptr);
+        this->menu->addElement(opt);
+        this->menu->setActiveOption(opt);
+        this->menu->addElement(new Aether::MenuSeparator(this->app->theme()->mutedLine()));
+        this->menu->addElement(new Aether::MenuOption("common.screen.settings"_lang, this->app->theme()->accent(), this->app->theme()->text(), [this](){
+            this->app->setScreen(ScreenID::Settings);
+        }));
+        this->menu->setFocussed(opt);
+        this->addElement(this->menu);
+
+        // Create list
+        this->list = new CustomElm::SortedList(420, 88, 810, 559);
+        this->list->setCatchup(11);
+        this->list->setHeadingColour(this->app->theme()->mutedText());
+        this->list->setScrollBarColour(this->app->theme()->mutedLine());
+        this->list->setSort(this->app->config()->lSort());
+        this->addElement(this->list);
+
+        // Render total hours string with initial value
+        this->hours = new Aether::Text(1215, 44, "common.loading"_lang, 20);
+        this->hours->setY(this->hours->y() - this->hours->h()/2);
         this->hours->setColour(this->app->theme()->mutedText());
         this->addElement(this->hours);
-        // Show update icon if needbe
-        this->updateElm =nullptr;
+
+        // Show update icon if needed
+        this->updateElm = nullptr;
         if (this->app->hasUpdate()) {
             this->updateElm = new Aether::Image(50, 669, "romfs:/icon/download.png");
-            this->updateElm->setColour(this->app->theme()->text());
+            static_cast<Aether::Texture*>(this->updateElm)->setColour(this->app->theme()->text());
             this->addElement(this->updateElm);
         }
     }
