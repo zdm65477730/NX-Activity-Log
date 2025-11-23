@@ -67,11 +67,9 @@ namespace Screen {
     }
 
     void RecentActivity::updateActivity() {
-        // Show update icon if needbe
-        if (this->updateElm == nullptr && this->app->hasUpdate()) {
-            this->updateElm = new Aether::Image(50, 669, "romfs:/icon/download.png");
-                static_cast<Aether::Texture*>(this->updateElm)->setColour(this->app->theme()->text());
-                this->addElement(this->updateElm);
+        // Only update if we have data
+        if (!this->app->playdata()->isInitialized()) {
+            return;
         }
 
         // Check if there is any activity + update heading
@@ -332,14 +330,8 @@ namespace Screen {
     }
 
     void RecentActivity::update(uint32_t dt) {
-        if (this->app->timeChanged() || this->app->playdata()->isInitialized()) {
+        if (this->app->timeChanged()) {
             this->updateActivity();
-            // Reset the hours text color in case it was changed during loading
-            this->hours->setColour(this->app->theme()->mutedText());
-        } else {
-            // Data still loading, keep showing loading state
-            this->hours->setString("common.loading"_lang);
-            this->hours->setColour(this->app->theme()->mutedText());
         }
 
         Screen::update(dt);
@@ -352,10 +344,10 @@ namespace Screen {
         this->heading->setColour(this->app->theme()->text());
         this->addElement(this->heading);
 
-        // Render total hours string with initial value
+        // Render total hours string with initial loading value
         this->hours = new Aether::Text(1215, 44, "common.loading"_lang, 20);
         this->hours->setY(this->hours->y() - this->hours->h()/2);
-        this->hours->setColour(this->app->theme()->mutedText());
+        this->hours->setColour(this->app->theme()->highlight1());
         this->addElement(this->hours);
 
         // Render user's image
@@ -448,7 +440,7 @@ namespace Screen {
         this->addElement(this->list);
 
         // Show update icon if needbe
-        this->updateElm =nullptr;
+        this->updateElm = nullptr;
         if (this->app->hasUpdate()) {
             this->updateElm = new Aether::Image(50, 669, "romfs:/icon/download.png");
             static_cast<Aether::Texture*>(this->updateElm)->setColour(this->app->theme()->text());
@@ -460,9 +452,9 @@ namespace Screen {
         this->removeElement(this->heading);
         this->removeElement(this->hours);
         this->removeElement(this->image);
-        this->removeElement(this->list);
         this->removeElement(this->menu);
         this->removeElement(this->updateElm);
+        this->removeElement(this->list);
     }
 
     void RecentActivity::onPush() {

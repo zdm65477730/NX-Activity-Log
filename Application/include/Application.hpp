@@ -76,6 +76,9 @@ namespace Main {
             std::atomic<bool> hasUpdate_;
             // Future for update check thread
             std::future<void> updateThread;
+
+            std::future<void> initThread;
+
             // Function to check for update
             void checkForUpdate();
 
@@ -99,6 +102,7 @@ namespace Main {
 
             // Vector of titles
             std::vector<NX::Title *> titles;
+
             // Index of "active" title (used for specific screens)
             unsigned int titleIdx;
 
@@ -169,9 +173,6 @@ namespace Main {
             NX::Title * activeTitle();
             // Set active title given index
             void setActiveTitle(unsigned int);
-
-            // Notify screens that title data has been updated
-            void notifyTitleDataUpdated();
 
             // Imports play data from a JSON (by matching usernames).
             // This operation is performed an it's own thread, updating the provided atomic.
