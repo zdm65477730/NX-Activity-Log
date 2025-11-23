@@ -83,92 +83,6 @@ namespace Screen {
         this->app->addOverlay(this->sortOverlay);
     }
 
-    void AllActivity::updateActivity() {
-        this->app->playdata()->waitForInitialization();
-
-        // Create list
-        this->list = new CustomElm::SortedList(420, 88, 810, 559);
-        this->list->setCatchup(11);
-        this->list->setHeadingColour(this->app->theme()->mutedText());
-        this->list->setScrollBarColour(this->app->theme()->mutedLine());
-
-        // Populate list + count total time
-        std::vector<AdjustmentValue> adjustments = this->app->config()->adjustmentValues();
-        std::vector<NX::Title *> t = this->app->titleVector();
-        std::vector<uint64_t> hidden = this->app->config()->hiddenTitles();
-        uint64_t totalSecs = 0;
-        for (size_t i = 0; i < t.size(); i++) {
-            // Skip over hidden games
-            if (std::find(hidden.begin(), hidden.end(), t[i]->titleID()) != hidden.end()) {
-                continue;
-            }
-
-            // Get statistics and append adjustment if needed
-            NX::RecentPlayStatistics *ps = this->app->playdata()->getRecentStatisticsForTitleAndUser(t[i]->titleID(), std::numeric_limits<u64>::min(), std::numeric_limits<u64>::max(), this->app->activeUser()->ID());
-            NX::PlayStatistics *ps2 = this->app->playdata()->getStatisticsForUser(t[i]->titleID(), this->app->activeUser()->ID());
-            std::vector<AdjustmentValue>::iterator it = std::find_if(adjustments.begin(), adjustments.end(), [this, t, i](AdjustmentValue val) {
-                return (val.titleID == t[i]->titleID() && val.userID == this->app->activeUser()->ID());
-            });
-            if (it != adjustments.end()) {
-                ps->playtime += (*it).value;
-            }
-
-            // Skip unplayed titles
-            totalSecs += ps->playtime;
-            if (ps->launches == 0) {
-                // Add in dummy data if not launched before (due to adjustment)
-                ps2->firstPlayed = Utils::Time::getTimeT(Utils::Time::getTmForCurrentTime());
-                ps2->lastPlayed = ps2->firstPlayed;
-                ps->launches = 1;
-
-                if (ps->playtime == 0) {
-                    delete ps;
-                    delete ps2;
-                    continue;
-                }
-            }
-
-            // "Convert" PlayStatistics to SortInfo
-            SortInfo * si = new SortInfo;
-            si->name = t[i]->name();
-            si->titleID = t[i]->titleID();
-            si->firstPlayed = ps2->firstPlayed;
-            si->lastPlayed = ps2->lastPlayed;
-            si->playtime = ps->playtime;
-            si->launches = ps->launches;
-
-            // Create ListActivity and add to list
-            CustomElm::ListActivity * la = new CustomElm::ListActivity();
-            la->setImage(t[i]->imgPtr(), t[i]->imgSize());
-            la->setTitle(t[i]->name());
-            la->setPlaytime(Utils::playtimeToPlayedForString(ps->playtime));
-            la->setLeftMuted(Utils::lastPlayedToString(ps2->lastPlayed));
-            la->setRightMuted(Utils::launchesToPlayedString(ps->launches));
-            la->onPress([this, i](){
-                this->app->setActiveTitle(i);
-                this->app->pushScreen();
-                this->app->setScreen(ScreenID::Details);
-            });
-            la->setTitleColour(this->app->theme()->text());
-            la->setPlaytimeColour(this->app->theme()->accent());
-            la->setMutedColour(this->app->theme()->mutedText());
-            la->setLineColour(this->app->theme()->mutedLine());
-            this->list->addElement(la, si);
-
-            delete ps;
-            delete ps2;
-        }
-
-        // Sort the list
-        this->list->setSort(this->app->config()->lSort());
-        this->addElement(this->list);
-
-        // Update total hours string
-        this->hours->setString(Utils::playtimeToTotalPlaytimeString(totalSecs));
-        this->hours->setXY(this->hours->x() - this->hours->w(), this->hours->y() - this->hours->h()/2);
-        this->hours->setColour(this->app->theme()->mutedText());
-    }
-
     void AllActivity::onLoad() {
         // Create heading using user's name
         this->heading = new Aether::Text(150, 45, Utils::formatHeading(this->app->activeUser()->username()), 28);
@@ -213,7 +127,94 @@ namespace Screen {
             this->addElement(this->updateElm);
         }
 
-        this->updateThread = std::async(std::launch::async, &AllActivity::updateActivity, this);
+        this->updateThread = std::async(std::launch::async, [this]() {
+            // Wait for playdata to be initialized
+            while (!this->app->playdata()->isInitialized()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            }
+
+            // Create list
+            this->list = new CustomElm::SortedList(420, 88, 810, 559);
+            this->list->setCatchup(11);
+            this->list->setHeadingColour(this->app->theme()->mutedText());
+            this->list->setScrollBarColour(this->app->theme()->mutedLine());
+
+            // Populate list + count total time
+            std::vector<AdjustmentValue> adjustments = this->app->config()->adjustmentValues();
+            std::vector<NX::Title *> t = this->app->titleVector();
+            std::vector<uint64_t> hidden = this->app->config()->hiddenTitles();
+            uint64_t totalSecs = 0;
+            for (size_t i = 0; i < t.size(); i++) {
+                // Skip over hidden games
+                if (std::find(hidden.begin(), hidden.end(), t[i]->titleID()) != hidden.end()) {
+                    continue;
+                }
+
+                // Get statistics and append adjustment if needed
+                NX::RecentPlayStatistics *ps = this->app->playdata()->getRecentStatisticsForTitleAndUser(t[i]->titleID(), std::numeric_limits<u64>::min(), std::numeric_limits<u64>::max(), this->app->activeUser()->ID());
+                NX::PlayStatistics *ps2 = this->app->playdata()->getStatisticsForUser(t[i]->titleID(), this->app->activeUser()->ID());
+                std::vector<AdjustmentValue>::iterator it = std::find_if(adjustments.begin(), adjustments.end(), [this, t, i](AdjustmentValue val) {
+                    return (val.titleID == t[i]->titleID() && val.userID == this->app->activeUser()->ID());
+                });
+                if (it != adjustments.end()) {
+                    ps->playtime += (*it).value;
+                }
+
+                // Skip unplayed titles
+                totalSecs += ps->playtime;
+                if (ps->launches == 0) {
+                    // Add in dummy data if not launched before (due to adjustment)
+                    ps2->firstPlayed = Utils::Time::getTimeT(Utils::Time::getTmForCurrentTime());
+                    ps2->lastPlayed = ps2->firstPlayed;
+                    ps->launches = 1;
+
+                    if (ps->playtime == 0) {
+                        delete ps;
+                        delete ps2;
+                        continue;
+                    }
+                }
+
+                // "Convert" PlayStatistics to SortInfo
+                SortInfo * si = new SortInfo;
+                si->name = t[i]->name();
+                si->titleID = t[i]->titleID();
+                si->firstPlayed = ps2->firstPlayed;
+                si->lastPlayed = ps2->lastPlayed;
+                si->playtime = ps->playtime;
+                si->launches = ps->launches;
+
+                // Create ListActivity and add to list
+                CustomElm::ListActivity * la = new CustomElm::ListActivity();
+                la->setImage(t[i]->imgPtr(), t[i]->imgSize());
+                la->setTitle(t[i]->name());
+                la->setPlaytime(Utils::playtimeToPlayedForString(ps->playtime));
+                la->setLeftMuted(Utils::lastPlayedToString(ps2->lastPlayed));
+                la->setRightMuted(Utils::launchesToPlayedString(ps->launches));
+                la->onPress([this, i](){
+                    this->app->setActiveTitle(i);
+                    this->app->pushScreen();
+                    this->app->setScreen(ScreenID::Details);
+                });
+                la->setTitleColour(this->app->theme()->text());
+                la->setPlaytimeColour(this->app->theme()->accent());
+                la->setMutedColour(this->app->theme()->mutedText());
+                la->setLineColour(this->app->theme()->mutedLine());
+                this->list->addElement(la, si);
+
+                delete ps;
+                delete ps2;
+            }
+
+            // Sort the list
+            this->list->setSort(this->app->config()->lSort());
+            this->addElement(this->list);
+
+            // Update total hours string
+            this->hours->setString(Utils::playtimeToTotalPlaytimeString(totalSecs));
+            this->hours->setXY(this->hours->x() - this->hours->w(), this->hours->y() - this->hours->h()/2);
+            this->hours->setColour(this->app->theme()->mutedText());
+        });
     }
 
     void AllActivity::onUnload() {
