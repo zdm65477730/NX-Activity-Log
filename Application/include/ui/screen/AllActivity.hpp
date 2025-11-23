@@ -29,7 +29,9 @@ namespace Screen {
             // Choose sort overlay
             Aether::PopupList * sortOverlay;
 
-            std::future<void> updateThread;
+            Thread updateThreadHandle;
+
+            static void updateThreadFunc(void* arg);
 
             // Set elements and highlight one in overlay
             void setupOverlay();

@@ -89,6 +89,16 @@ namespace Main {
         }
         this->userIdx = 0;
 
+        // Handle titles vector asynchronously (64KiB stack size should be enough)
+        Result rc = threadCreate(&this->initThreadHandle, Application::initThreadFunc, this, NULL, 0x40000, 0x2C, -2);
+        if (R_FAILED(rc)) {
+            return;
+        } else {
+            threadStart(&initThreadHandle);
+        }
+
+        this->titleIdx = 0;
+
         // Create Aether instance (ignore log messages for now)
         this->window = new Aether::Window("NX-Activity-Log", 1280, 720, [](const std::string message, const bool important) {});
         // this->window->showDebugInfo(true);
@@ -114,6 +124,17 @@ namespace Main {
             this->window->setFadeOut(true);
             this->setScreen(ScreenID::UserSelect);
         }
+    }
+
+    void Application::initThreadFunc(void* arg) {
+        Application* app = static_cast<Application*>(arg);
+        app->playdata_->waitForInitialize();
+        app->titles = Utils::NX::getTitleObjects(app->users);
+        std::vector<NX::Title *> missing = app->playdata_->getMissingTitles(app->titles);
+        for (NX::Title * title : missing) {
+            app->titles.push_back(title);
+        }
+        app->playdata_->setInitialized(true);
     }
 
     void Application::checkForUpdate() {
@@ -476,6 +497,8 @@ namespace Main {
     }
 
     Application::~Application() {
+        threadWaitForExit(&this->initThreadHandle);
+
         // Delete user objects
         while (users.size() > 0) {
             delete users[0];
@@ -512,6 +535,8 @@ namespace Main {
 
         // Install update if present
         Utils::Update::install();
+
+        threadClose(&this->initThreadHandle);
 
         if (this->isUserPage_) {
             appletRequestExitToSelf();
