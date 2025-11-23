@@ -35,20 +35,6 @@ namespace Main {
         }
 
         this->playdata_ = new NX::PlayData();
-        // Handle titles vector asynchronously (both getTitleObjects and getMissingTitles are time-consuming)
-        this->initThread = std::async(std::launch::async, [this]() {
-            this->playdata_->waitForInitialize();
-
-            // Populate titles vector
-            this->titles = Utils::NX::getTitleObjects(this->users);
-            std::vector<NX::Title *> missing = this->playdata_->getMissingTitles(this->titles);
-            for (NX::Title * title : missing) {
-                this->titles.push_back(title);
-            }
-            // Set Playdata initialized flag that title data has been updated
-            this->playdata_->setInitialized(true);
-        });
-        this->titleIdx = 0;
 
         this->theme_ = new Theme(this->config_->gTheme());
 
