@@ -93,8 +93,7 @@ namespace NX {
             std::atomic<bool> initialized;
 
             // Thread for asynchronous initialization
-            std::future<PlayEventsAndSummaries> pdmThread;
-            std::future<PlayEventsAndSummaries> impThread;
+            std::future<void> initThread;
 
             // Return vector of PD_Sessions for given title/user IDs + time range
             // Give a titleID of zero to include all titles
@@ -113,6 +112,9 @@ namespace NX {
             // Merges the data within the two passed vectors by only keeping unique PlayEvents
             std::vector<PlayEvent *> mergePlayEvents(std::vector<PlayEvent *> &, std::vector<PlayEvent *> &);
 
+            // Asynchronously initialize play data
+            void initializeAsync();
+
         public:
             // The constructor prepares + creates PlayEvents
             PlayData();
@@ -120,10 +122,10 @@ namespace NX {
             // Check if initialization is complete
             bool isInitialized();
 
-            void setInitialized(bool state);
+            void setInitialized(bool initialized);
 
             // Wait for initialization to complete
-            void waitForInitialize();
+            void waitForInitialization();
 
             // Returns title objects that are not present in the given vector
             std::vector<Title *> getMissingTitles(std::vector<Title *>);

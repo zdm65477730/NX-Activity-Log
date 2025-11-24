@@ -6,45 +6,51 @@
 #include "ui/element/SortedList.hpp"
 #include "Types.hpp"
 
-// Forward declaration due to circular dependency
+// Forward declare classes which are only used as pointers
 namespace Main {
     class Application;
 };
+namespace NX {
+    struct RecentPlayStatistics;
+    struct PlayStatistics;
+};
 
 namespace Screen {
-    // "All Activity" page
+    // AllActivity is the screen which shows all of a user's played titles
     class AllActivity : public Aether::Screen {
         private:
-            // Pointer to main app object for user + titles
+            // Pointer to application class
             Main::Application * app;
 
-            // Pointers to elements
+            // Elements
             Aether::Text * heading;
             Aether::Text * hours;
             Aether::Image * image;
             CustomElm::SortedList * list;
             Aether::Menu * menu;
-            Aether::Image * updateElm;
-
-            // Choose sort overlay
             Aether::PopupList * sortOverlay;
+            Aether::Element * updateElm;
 
             std::future<void> updateThread;
 
-            // Set elements and highlight one in overlay
+            // Setups the sort overlay with entries
             void setupOverlay();
 
+            // Updates the activity list based on current data
+            void updateActivity();
+
         public:
-            // Passed main application object
+            // Constructor requires pointer to application class
             AllActivity(Main::Application *);
 
-            // Prepare user-specific elements
+            // Creates "static" elements (which don't change between loads)
+            // onLoad() is called after constructor
             void onLoad();
 
-            // Delete elements created in onLoad()
+            // Destroys elements created in onLoad() and createListElements()
             void onUnload();
 
-            // Deletes overlay
+            // Destructor
             ~AllActivity();
     };
 };

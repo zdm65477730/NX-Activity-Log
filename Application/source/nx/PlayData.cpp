@@ -272,7 +272,6 @@ namespace NX {
 
         // Free memory allocated to array
         delete[] pEvents;
-
         return ret;
     }
 
@@ -379,28 +378,32 @@ namespace NX {
     }
 
     PlayData::PlayData() : initialized(false) {
-        // Read in all data simultaneously
-        this->pdmThread = std::async(std::launch::async, [this]() -> PlayEventsAndSummaries {
-            return this->readPlayDataFromPdm();
-        });
-        this->impThread = std::async(std::launch::async, [this]() -> PlayEventsAndSummaries {
-            return this->readPlayDataFromImport();
-        });
+        // Start async initialization
+        this->initThread = std::async(std::launch::async, &PlayData::initializeAsync, this);
+    }
+
+    void PlayData::initializeAsync() {
+        // Read in all data synchronously in this thread
+        PlayEventsAndSummaries pdmData = this->readPlayDataFromPdm();
+
+        PlayEventsAndSummaries impData = this->readPlayDataFromImport();
+
+        this->events = this->mergePlayEvents(pdmData.first, impData.first);
+        this->summaries = impData.second;
     }
 
     bool PlayData::isInitialized() {
         return this->initialized.load();
     }
 
-    void PlayData::setInitialized(bool state) {
-        this->initialized.store(state);
+    void PlayData::setInitialized(bool initialized) {
+        this->initialized.store(initialized);
     }
 
-    void PlayData::waitForInitialize() {
-        PlayEventsAndSummaries pdmData = this->pdmThread.get();
-        PlayEventsAndSummaries impData = this->impThread.get();
-        this->events = this->mergePlayEvents(pdmData.first, impData.first);
-        this->summaries = impData.second;
+    void PlayData::waitForInitialization() {
+        if (this->initThread.valid()) {
+            this->initThread.get();
+        }
     }
 
     std::vector<Title *> PlayData::getMissingTitles(std::vector<Title *> passed) {
@@ -416,7 +419,6 @@ namespace NX {
                 missing.push_back(new Title(title.first, title.second));
             }
         }
-
         return missing;
     }
 
