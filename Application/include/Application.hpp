@@ -77,9 +77,7 @@ namespace Main {
             // Future for update check thread
             std::future<void> updateThread;
 
-            Thread initThreadHandle;
-
-            static void initThreadFunc(void* arg);
+            std::future<void> initThread;
 
             // Function to check for update
             void checkForUpdate();
