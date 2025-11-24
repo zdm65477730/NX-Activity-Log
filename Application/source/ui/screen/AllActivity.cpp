@@ -84,14 +84,6 @@ namespace Screen {
     }
 
     void AllActivity::updateActivity() {
-        this->app->playdata()->waitForInitialization();
-
-        // Create list
-        this->list = new CustomElm::SortedList(420, 88, 810, 559);
-        this->list->setCatchup(11);
-        this->list->setHeadingColour(this->app->theme()->mutedText());
-        this->list->setScrollBarColour(this->app->theme()->mutedLine());
-
         // Populate list + count total time
         std::vector<AdjustmentValue> adjustments = this->app->config()->adjustmentValues();
         std::vector<NX::Title *> t = this->app->titleVector();
@@ -165,8 +157,28 @@ namespace Screen {
 
         // Update total hours string
         this->hours->setString(Utils::playtimeToTotalPlaytimeString(totalSecs));
-        this->hours->setXY(this->hours->x() - this->hours->w(), this->hours->y() - this->hours->h()/2);
-        this->hours->setColour(this->app->theme()->mutedText());
+
+        // Show update icon if needbe
+        if (this->updateElm == nullptr && this->app->hasUpdate()) {
+            this->updateElm = new Aether::Image(50, 669, "romfs:/icon/download.png");
+                static_cast<Aether::Texture*>(this->updateElm)->setColour(this->app->theme()->text());
+                this->addElement(this->updateElm);
+        }
+    }
+
+    void AllActivity::update(uint32_t dt) {
+        // Check if play data is initialized and update UI accordingly
+        if (this->app->timeChanged() || this->app->playdata()->isInitialized()) {
+            this->updateActivity();
+            // Reset the hours text color in case it was changed during loading
+            this->hours->setColour(this->app->theme()->mutedText());
+        } else {
+            // Data still loading, keep showing loading state
+            this->hours->setString("common.loading"_lang);
+            this->hours->setColour(this->app->theme()->mutedText());
+        }
+        
+        Screen::update(dt);
     }
 
     void AllActivity::onLoad() {
@@ -197,32 +209,36 @@ namespace Screen {
         this->menu->setFocussed(opt);
         this->addElement(this->menu);
 
-        this->list = nullptr;
+        // Create list
+        this->list = new CustomElm::SortedList(420, 88, 810, 559);
+        this->list->setCatchup(11);
+        this->list->setHeadingColour(this->app->theme()->mutedText());
+        this->list->setScrollBarColour(this->app->theme()->mutedLine());
+        this->list->setSort(this->app->config()->lSort());
+        this->addElement(this->list);
 
         // Render total hours string with initial value
         this->hours = new Aether::Text(1215, 44, "common.loading"_lang, 20);
-        this->hours->setXY(this->hours->x() - this->hours->w(), this->hours->y() - this->hours->h()/2);
-        this->hours->setColour(this->app->theme()->highlight1());
+        this->hours->setY(this->hours->y() - this->hours->h()/2);
+        this->hours->setColour(this->app->theme()->mutedText());
         this->addElement(this->hours);
 
-        // Show update icon if needbe
-        this->updateElm =nullptr;
+        // Show update icon if needed
+        this->updateElm = nullptr;
         if (this->app->hasUpdate()) {
             this->updateElm = new Aether::Image(50, 669, "romfs:/icon/download.png");
             static_cast<Aether::Texture*>(this->updateElm)->setColour(this->app->theme()->text());
             this->addElement(this->updateElm);
         }
-
-        this->updateThread = std::async(std::launch::async, &AllActivity::updateActivity, this);
     }
 
     void AllActivity::onUnload() {
         this->removeElement(this->heading);
         this->removeElement(this->hours);
         this->removeElement(this->image);
+        this->removeElement(this->list);
         this->removeElement(this->menu);
         this->removeElement(this->updateElm);
-        this->removeElement(this->list);
     }
 
     AllActivity::~AllActivity() {

@@ -35,7 +35,6 @@ namespace Main {
         }
 
         this->playdata_ = new NX::PlayData();
-
         this->theme_ = new Theme(this->config_->gTheme());
 
         // Start update thread
@@ -76,24 +75,23 @@ namespace Main {
         this->userIdx = 0;
 
         // Handle titles vector asynchronously (both getTitleObjects and getMissingTitles are time-consuming)
-        this->initThread = std::async(std::launch::async, [this]() {
-            this->playdata_->waitForInitialization();
-
+        std::thread([this]() {
             // Populate titles vector
             this->titles = Utils::NX::getTitleObjects(this->users);
-
             std::vector<NX::Title *> missing = this->playdata_->getMissingTitles(this->titles);
-
             for (NX::Title * title : missing) {
                 this->titles.push_back(title);
             }
-            // Set Playdata initialized flag that title data has been updated
+            // Set Playdata initialized flag and notify screens that title data has been updated
             this->playdata_->setInitialized(true);
-        });
+            this->notifyTitleDataUpdated();
+        }).detach();
         this->titleIdx = 0;
 
         // Create Aether instance (ignore log messages for now)
-        this->window = new Aether::Window("NX-Activity-Log", 1280, 720, [](const std::string message, const bool important) {});
+        this->window = new Aether::Window("NX-Activity-Log", 1280, 720, [](const std::string message, const bool important) {
+
+        });
         // this->window->showDebugInfo(true);
 
         // Create overlays
@@ -445,6 +443,11 @@ namespace Main {
 
     void Application::setActiveTitle(unsigned int i) {
         this->titleIdx = i;
+    }
+
+    void Application::notifyTitleDataUpdated() {
+        // Recreate screens to reflect updated title data
+        this->reinitScreens(ScreenCreate::Normal);
     }
 
     void Application::importFromJSON(std::atomic<double> & percent) {

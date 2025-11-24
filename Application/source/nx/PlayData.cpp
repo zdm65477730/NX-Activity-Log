@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include "nlohmann/json.hpp"
 #include "nx/PlayData.hpp"
 #include "utils/NX.hpp"
@@ -272,6 +273,7 @@ namespace NX {
 
         // Free memory allocated to array
         delete[] pEvents;
+
         return ret;
     }
 
@@ -379,13 +381,12 @@ namespace NX {
 
     PlayData::PlayData() : initialized(false) {
         // Start async initialization
-        this->initThread = std::async(std::launch::async, &PlayData::initializeAsync, this);
+        this->initThread = std::thread(&PlayData::initializeAsync, this);
     }
 
     void PlayData::initializeAsync() {
         // Read in all data synchronously in this thread
         PlayEventsAndSummaries pdmData = this->readPlayDataFromPdm();
-
         PlayEventsAndSummaries impData = this->readPlayDataFromImport();
 
         this->events = this->mergePlayEvents(pdmData.first, impData.first);
@@ -397,16 +398,19 @@ namespace NX {
     }
 
     void PlayData::setInitialized(bool initialized) {
-        this->initialized.store(initialized);
+        this->initialized = initialized;
     }
 
     void PlayData::waitForInitialization() {
-        if (this->initThread.valid()) {
-            this->initThread.get();
+        if (this->initThread.joinable()) {
+            this->initThread.join();
         }
     }
 
     std::vector<Title *> PlayData::getMissingTitles(std::vector<Title *> passed) {
+        // Wait for initialization before accessing data
+        this->waitForInitialization();
+        
         // Iterate over events and summaries, creating title objects for
         // titles not present in passed vector
         std::vector <Title *> missing;
@@ -419,6 +423,7 @@ namespace NX {
                 missing.push_back(new Title(title.first, title.second));
             }
         }
+
         return missing;
     }
 

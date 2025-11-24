@@ -1,7 +1,6 @@
 #ifndef ALLACTIVITY_HPP
 #define ALLACTIVITY_HPP
 
-#include <future>
 #include "Aether/Aether.hpp"
 #include "ui/element/SortedList.hpp"
 #include "Types.hpp"
@@ -31,8 +30,6 @@ namespace Screen {
             Aether::PopupList * sortOverlay;
             Aether::Element * updateElm;
 
-            std::future<void> updateThread;
-
             // Setups the sort overlay with entries
             void setupOverlay();
 
@@ -49,7 +46,10 @@ namespace Screen {
 
             // Destroys elements created in onLoad() and createListElements()
             void onUnload();
-
+            
+            // 更新函数
+            void update(uint32_t dt) override;
+            
             // Destructor
             ~AllActivity();
     };

@@ -180,7 +180,7 @@ namespace Utils::NX {
             }
 
             // Free memory allocated to array
-            delete[] userPlayEvents;
+            delete[] userPlayEvents ;
         }
 
         // Get IDs of all installed titles

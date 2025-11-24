@@ -2,7 +2,7 @@
 #define PLAYDATA_HPP
 
 #include <atomic>
-#include <future>
+#include <thread>
 #include "nx/Title.hpp"
 #include "Types.hpp"
 #include <vector>
@@ -93,7 +93,7 @@ namespace NX {
             std::atomic<bool> initialized;
 
             // Thread for asynchronous initialization
-            std::future<void> initThread;
+            std::thread initThread;
 
             // Return vector of PD_Sessions for given title/user IDs + time range
             // Give a titleID of zero to include all titles
