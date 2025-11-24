@@ -12,6 +12,11 @@ jobs:
     if: contains(github.event.comment.body, '/release-action')
 
     steps:
+      - name: Update packages
+        run: |
+          sudo -n apt-get update
+          sudo -n apt-get upgrade -y git build-essential
+        shell: bash
       - name: Update latest libnx
         run: |
           git config --global --add safe.directory "*"
@@ -20,7 +25,7 @@ jobs:
           make install -j$(nproc)
         shell: bash
       - name: Checkout latest code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4.1.1
         with:
           ref: master
           clean: true

@@ -1,56 +1,44 @@
-#ifndef ALLACTIVITY_HPP
-#define ALLACTIVITY_HPP
+#ifndef SCREEN_ALLACTIVITY_HPP
+#define SCREEN_ALLACTIVITY_HPP
 
-#include "Aether/Aether.hpp"
 #include "ui/element/SortedList.hpp"
-#include "Types.hpp"
 
-// Forward declare classes which are only used as pointers
+// Forward declaration due to circular dependency
 namespace Main {
     class Application;
 };
-namespace NX {
-    struct RecentPlayStatistics;
-    struct PlayStatistics;
-};
 
 namespace Screen {
-    // AllActivity is the screen which shows all of a user's played titles
+    // "All Activity" page
     class AllActivity : public Aether::Screen {
         private:
-            // Pointer to application class
+            // Pointer to main app object for user + titles
             Main::Application * app;
 
-            // Elements
+            // Pointers to elements
             Aether::Text * heading;
             Aether::Text * hours;
             Aether::Image * image;
             CustomElm::SortedList * list;
             Aether::Menu * menu;
-            Aether::PopupList * sortOverlay;
-            Aether::Element * updateElm;
+            Aether::Image * updateElm;
 
-            // Setups the sort overlay with entries
+            // Choose sort overlay
+            Aether::PopupList * sortOverlay;
+
+            // Set elements and highlight one in overlay
             void setupOverlay();
 
-            // Updates the activity list based on current data
-            void updateActivity();
-
         public:
-            // Constructor requires pointer to application class
+            // Passed main application object
             AllActivity(Main::Application *);
 
-            // Creates "static" elements (which don't change between loads)
-            // onLoad() is called after constructor
+            // Prepare user-specific elements
             void onLoad();
-
-            // Destroys elements created in onLoad() and createListElements()
+            // Delete elements created in onLoad()
             void onUnload();
-            
-            // 更新函数
-            void update(uint32_t dt) override;
-            
-            // Destructor
+
+            // Deletes overlay
             ~AllActivity();
     };
 };
