@@ -34,7 +34,7 @@ BUILD		:=	build
 INCLUDES	:=	include
 SOURCES		:=	source
 ROMFS		:=	romfs
-LIBS		:=	-lAether -lcurl -lnx `sdl2-config --libs` -lSDL2_ttf `freetype-config --libs` -lSDL2_gfx -lSDL2_image -lpng -ljpeg -lwebp -lSimpleIniParser -lharfbuzz
+LIBS		:=	-lAether -lcurl -lSDL2 -lSDL2_ttf -lSDL2_gfx -lSDL2_image -lpng -ljpeg -lwebp -lSimpleIniParser -lharfbuzz -lfreetype -lz -lbz2 -lEGL -lglapi -ldrm_nouveau -lm -lnx
 LIBDIRS		:=	$(PORTLIBS) $(LIBNX) $(CURDIR)/libs/Aether $(CURDIR)/libs/json $(CURDIR)/libs/SimpleIniParser
 FORWARDER	:=	$(ROMFS)/exefs.nsp
 
@@ -43,7 +43,7 @@ FORWARDER	:=	$(ROMFS)/exefs.nsp
 #---------------------------------------------------------------------------------
 VER_MAJOR	:= 1
 VER_MINOR	:= 5
-VER_MICRO	:= 7
+VER_MICRO	:= 8
 
 #---------------------------------------------------------------------------------
 # Options for .nacp information
@@ -71,7 +71,7 @@ OUTPUT		:=	$(CURDIR)/$(TARGET)
 # Flags to pass to compiler
 #---------------------------------------------------------------------------------
 DEFINES		:=	-D__SWITCH__ -DVER_MAJOR=$(VER_MAJOR) -DVER_MINOR=$(VER_MINOR) -DVER_MICRO=$(VER_MICRO) -DVER_STRING=\"$(VER_MAJOR).$(VER_MINOR).$(VER_MICRO)\"
-CFLAGS		:=	-g -Wall -O2 -ffunction-sections $(ARCH) $(DEFINES) $(INCLUDE) `freetype-config --cflags` `sdl2-config --cflags`
+CFLAGS		:=	-g -Wall -O2 -ffunction-sections $(ARCH) $(DEFINES) $(INCLUDE)
 CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions -std=c++23
 
 #----------------------------------------------------------------------------------------------------------------------
