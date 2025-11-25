@@ -42,7 +42,7 @@ std::string toString(Language l) {
             break;
 
         case Language::ChineseTraditional:
-            str = "繁体中文";
+            str = "繁體中文";
             break;
 
         case Language::Chinese:
