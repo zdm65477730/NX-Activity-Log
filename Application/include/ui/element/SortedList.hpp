@@ -33,6 +33,9 @@ namespace CustomElm {
             // X, Y, W, H
             SortedList(int, int, int, int);
 
+            // Bring base class addElement into scope to prevent hiding
+            using Aether::List::addElement;
+
             // An added element needs to have relevant information stored in order to sort
             // Only accepts ListActivity due to information requirements
             void addElement(ListActivity *, SortInfo *);

@@ -1,14 +1,13 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
-#include <future>
 #include "nlohmann/json.hpp"
 #include "nx/PlayData.hpp"
 #include "utils/NX.hpp"
 #include "utils/Time.hpp"
 
 // Maximum number of entries to process in one iteration
-#define MAX_PROCESS_ENTRIES 4096
+#define MAX_PROCESS_ENTRIES 32768
 
 namespace NX {
     std::vector<PD_Session> PlayData::getPDSessions(TitleID titleID, AccountUid userID, u64 start_ts, u64 end_ts) {
@@ -55,7 +54,7 @@ namespace NX {
                                 struct PD_Session st;
                                 st.index = s;
                                 st.num = a - s + 1;
-                                sessions.push_back(st);
+                                sessions.emplace_back(st);
                             }
                             end = true;
                             break;
@@ -66,7 +65,7 @@ namespace NX {
                                 struct PD_Session st;
                                 st.index = s;
                                 st.num = a - s;
-                                sessions.push_back(st);
+                                sessions.emplace_back(st);
                             }
                             end = true;
                             a--;
@@ -267,7 +266,7 @@ namespace NX {
                 event->steadyTimestamp = pEvents[i].timestamp_steady;
 
                 // Add PlayEvent to vector
-                ret.first.push_back(event);
+                ret.first.emplace_back(event);
             }
         }
 
@@ -323,7 +322,7 @@ namespace NX {
                             evt->steadyTimestamp = event["steadyTimestamp"];
 
                             hasEntry = true;
-                            ret.first.push_back(evt);
+                            ret.first.emplace_back(evt);
                         }
                     }
                 }
@@ -340,15 +339,15 @@ namespace NX {
                         stats->launches = summary["launches"];
 
                         hasEntry = true;
-                        ret.second.push_back(stats);
+                        ret.second.emplace_back(stats);
                     }
                 }
 
                 // Store data if entry added
                 if (hasEntry) {
-                    if (std::find_if(this->titles.begin(), this->titles.end(), [title](std::pair<u64, std::string> entry) { return (title["id"] == entry.first); }) == this->titles.end()) {
+                    if (std::find_if(this->importTitles.begin(), this->importTitles.end(), [title](std::pair<u64, std::string> entry) { return (title["id"] == entry.first); }) == this->importTitles.end()) {
                         if (title["id"] != 0) {
-                            this->titles.push_back(std::make_pair(title["id"], title["name"]));
+                            this->importTitles.emplace_back(std::make_pair(title["id"], title["name"]));
                         }
                     }
                 }
@@ -357,42 +356,72 @@ namespace NX {
         return ret;
     }
 
-    std::vector<PlayEvent *> PlayData::mergePlayEvents(std::vector<PlayEvent *> & one, std::vector<PlayEvent *> & two) {
-        std::vector<PlayEvent *> merged = one;
+    PlayData::PlayData() : currentProgress(0), maxProgress(1), progressCallback(nullptr) {
+        // Read in all data simultaneously
+        this->pdmThread = std::async(std::launch::async, [this]() -> PlayEventsAndSummaries {
+            return this->readPlayDataFromPdm();
+        });
+        this->impThread = std::async(std::launch::async, [this]() -> PlayEventsAndSummaries {
+            return this->readPlayDataFromImport();
+        });
+    }
 
-        for (PlayEvent * event : two) {
-            std::vector<PlayEvent *>::iterator it = std::find_if(one.begin(), one.end(), [event](PlayEvent * pot) {
+    void PlayData::initPlayEvents() {
+        // Update progress
+        PlayEventsAndSummaries pdmData = this->pdmThread.get();
+        if (this->progressCallback) {
+            this->currentProgress.store(this->currentProgress.load() + 1);
+            this->progressCallback(this->currentProgress.load(), this->maxProgress.load());
+        }
+
+        PlayEventsAndSummaries impData = this->impThread.get();
+        if (this->progressCallback) {
+            this->currentProgress.store(this->currentProgress.load() + 1);
+            this->progressCallback(this->currentProgress.load(), this->maxProgress.load());
+        }
+
+        this->summaries = impData.second;
+        this->events = pdmData.first;
+        for (PlayEvent * event : impData.first) {
+            std::vector<PlayEvent *>::iterator it = std::find_if(pdmData.first.begin(), pdmData.first.end(), [event](PlayEvent * pot) {
                 return (event->type == pot->type && event->titleID == pot->titleID &&
                         event->eventType == pot->eventType && event->clockTimestamp == pot->clockTimestamp && event->steadyTimestamp == pot->steadyTimestamp);
             });
 
             // Copy event or delete if duplicate
-            if (it == one.end()) {
-                merged.push_back(event);
+            if (it == pdmData.first.end()) {
+                this->events.emplace_back(event);
             } else {
                 delete event;
             }
         }
+        if (this->progressCallback) {
+            this->currentProgress.store(this->currentProgress.load() + 1);
+            this->progressCallback(this->currentProgress.load(), this->maxProgress.load());
+        }
 
-        one.clear();
-        two.clear();
-        return merged;
+        pdmData.first.clear();
+        impData.first.clear();
     }
 
-    PlayData::PlayData() {
-        // Read in all data simultaneously
-        std::future<PlayEventsAndSummaries> pdmThread = std::async(std::launch::async, [this]() -> PlayEventsAndSummaries {
-            return this->readPlayDataFromPdm();
-        });
-        std::future<PlayEventsAndSummaries> impThread = std::async(std::launch::async, [this]() -> PlayEventsAndSummaries {
-            return this->readPlayDataFromImport();
-        });
+    void PlayData::setProgressCallback(ProgressCallback callback) {
+        this->progressCallback = callback;
+    }
 
-        PlayEventsAndSummaries pdmData = pdmThread.get();
-        PlayEventsAndSummaries impData = impThread.get();
+    int PlayData::getCurrentProgress() const {
+        return this->currentProgress.load();
+    }
 
-        this->events = this->mergePlayEvents(pdmData.first, impData.first);
-        this->summaries = impData.second;
+    void PlayData::setCurrentProgress(int current) {
+        this->currentProgress.store(current);
+    }
+
+    int PlayData::getMaxProgress() const {
+        return this->maxProgress.load();
+    }
+
+    void PlayData::setMaxProgress(int max) {
+        this->maxProgress.store(max);
     }
 
     std::vector<Title *> PlayData::getMissingTitles(std::vector<Title *> passed) {
@@ -400,12 +429,12 @@ namespace NX {
         // titles not present in passed vector
         std::vector <Title *> missing;
 
-        for (std::pair<u64, std::string> title : this->titles) {
+        for (std::pair<u64, std::string> title : this->importTitles) {
             std::vector<Title *>::iterator it = std::find_if(passed.begin(), passed.end(), [title](Title * t) {
                 return (title.first == t->titleID());
             });
             if (it == passed.end()) {
-                missing.push_back(new Title(title.first, title.second));
+                missing.emplace_back(new Title(title.first, title.second));
             }
         }
 
@@ -423,7 +452,7 @@ namespace NX {
                 if (this->events[j]->eventType == Applet_OutFocus && this->events[j-1]->eventType == Applet_OutFocus) {
                     continue;
                 }
-                events.push_back(*this->events[j]);
+                events.emplace_back(*this->events[j]);
             }
         }
 
@@ -481,7 +510,7 @@ namespace NX {
             p.playtime = rps->playtime;
             delete rps;
 
-            sessions.push_back(p);
+            sessions.emplace_back(p);
         }
 
         return sessions;

@@ -4,8 +4,14 @@
 #include "nx/Title.hpp"
 #include "Types.hpp"
 #include <vector>
+#include <future>
+#include <functional>
+#include <atomic>
 
 namespace NX {
+    // Progress callback function type
+    typedef std::function<void(int, int)> ProgressCallback;
+
     // Enumeration for event type in PlayEvent struct
     enum PlayEventType {
         PlayEvent_Applet,       // PlayEvent contains applet event
@@ -81,11 +87,22 @@ namespace NX {
             std::vector<PlayStatistics *> summaries;
 
             // Vector of titles in imported data
-            std::vector<std::pair<u64, std::string>> titles;
+            std::vector<std::pair<u64, std::string>> importTitles;
 
             // Timestamp indicating when summaries were imported
             // Used to "merge" with system stats
             uint64_t importTimestamp;
+
+            // Async threads for reading data
+            std::future<PlayEventsAndSummaries> pdmThread;
+            std::future<PlayEventsAndSummaries> impThread;
+
+            // Progress tracking
+            std::atomic<int> currentProgress;
+            std::atomic<int> maxProgress;
+
+            // Progress callback function
+            ProgressCallback progressCallback;
 
             // Return vector of PD_Sessions for given title/user IDs + time range
             // Give a titleID of zero to include all titles
@@ -101,12 +118,23 @@ namespace NX {
             // Reads and parses data from imported file
             PlayEventsAndSummaries readPlayDataFromImport();
 
-            // Merges the data within the two passed vectors by only keeping unique PlayEvents
-            std::vector<PlayEvent *> mergePlayEvents(std::vector<PlayEvent *> &, std::vector<PlayEvent *> &);
-
         public:
             // The constructor prepares + creates PlayEvents
             PlayData();
+
+            // The destructor deletes PlayEvents (frees memory)
+            ~PlayData();
+
+            void setProgressCallback(ProgressCallback callback);
+
+            // Gets current progress of data initialization
+            int getCurrentProgress() const;
+            int getMaxProgress() const;
+            void setCurrentProgress(int current);
+            void setMaxProgress(int max);
+
+            // Merges the data within the two passed vectors by only keeping unique PlayEvents
+            void initPlayEvents();
 
             // Returns title objects that are not present in the given vector
             std::vector<Title *> getMissingTitles(std::vector<Title *>);
@@ -126,9 +154,6 @@ namespace NX {
 
             // Returns a PlayStatistics for the given titleID and userID
             PlayStatistics * getStatisticsForUser(TitleID, AccountUid);
-
-            // The destructor deletes PlayEvents (frees memory)
-            ~PlayData();
     };
 };
 

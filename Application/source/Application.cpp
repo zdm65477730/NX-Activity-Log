@@ -11,6 +11,7 @@
 #include "ui/screen/CustomTheme.hpp"
 #include "ui/screen/Details.hpp"
 #include "ui/screen/HideTitles.hpp"
+#include "ui/screen/LoadingScreen.hpp"
 #include "ui/screen/RecentActivity.hpp"
 #include "ui/screen/Settings.hpp"
 #include "ui/screen/Update.hpp"
@@ -35,6 +36,14 @@ namespace Main {
         }
 
         this->playdata_ = new NX::PlayData();
+
+        // Set PlayData progress callback and start async loading
+        this->playdata_->setProgressCallback([this](int current, int max) {
+            this->scloadingScreen->setProgress((float)current / (float)max);
+        });
+
+        this->titleIdx = 0;
+
         this->theme_ = new Theme(this->config_->gTheme());
 
         // Start update thread
@@ -46,7 +55,7 @@ namespace Main {
         this->isUserPage_ = false;
         if (u != nullptr) {
             this->isUserPage_ = true;
-            this->users.push_back(u);
+            this->users.emplace_back(u);
         }
 
         // Set view to today and by day
@@ -74,18 +83,8 @@ namespace Main {
         }
         this->userIdx = 0;
 
-        // Populate titles vector
-        this->titles = Utils::NX::getTitleObjects(this->users);
-        std::vector<NX::Title *> missing = this->playdata_->getMissingTitles(this->titles);
-        for (NX::Title * title : missing) {
-            this->titles.push_back(title);
-        }
-        this->titleIdx = 0;
-
         // Create Aether instance (ignore log messages for now)
-        this->window = new Aether::Window("NX-Activity-Log", 1280, 720, [](const std::string message, const bool important) {
-
-        });
+        this->window = new Aether::Window("NX-Activity-Log", 1280, 720, [](const std::string message, const bool important) {});
         // this->window->showDebugInfo(true);
 
         // Create overlays
@@ -100,14 +99,57 @@ namespace Main {
         this->createScreens();
         this->reinitScreens_ = ReinitState::False;
 
-        if (this->isUserPage_) {
-            // Skip UserSelect screen if launched via user page
-            this->setScreen(this->config_->lScreen());
+        // Default to loading screen
+        this->window->setFadeIn(true);
+        this->window->setFadeOut(true);
+        this->setScreen(ScreenID::LoadingScreen);
+
+        // Handle titles vector asynchronously (64KiB heap size should be enough)
+        Result rc = threadCreate(&this->initThreadHandle, Application::initThreadFunc, this, NULL, 0x40000, 0x2C, -2);
+        if (R_FAILED(rc)) {
+            return;
         } else {
-            // Start with UserSelect screen
-            this->window->setFadeIn(true);
-            this->window->setFadeOut(true);
-            this->setScreen(ScreenID::UserSelect);
+            threadStart(&initThreadHandle);
+        }
+    }
+
+    void Application::initThreadFunc(void* arg) {
+        Application* app = static_cast<Application*>(arg);
+
+        const int max = 5; // 5 steps: read pdm, read import, merge, titles, merge missing
+        int current = 0;
+        float progress = 0.0f;
+        app->playdata_->setMaxProgress(max);
+        app->playdata_->setCurrentProgress(current);
+
+        app->playdata_->initPlayEvents();
+
+        // Populate titles vector
+        app->titles = Utils::NX::getTitleObjects(app->users);
+        app->playdata_->setCurrentProgress(app->playdata_->getCurrentProgress() + 1);
+        progress = (float)app->playdata_->getCurrentProgress() / max;
+        app->scloadingScreen->setProgress(progress);
+
+        // Get missing titles from PlayData
+        std::vector<NX::Title *> missing = app->playdata_->getMissingTitles(app->titles);
+        for (NX::Title * title : missing) {
+            app->titles.emplace_back(title);
+        }
+        app->playdata_->setCurrentProgress(app->playdata_->getCurrentProgress() + 1);
+        progress = (float)app->playdata_->getCurrentProgress() / max;
+        app->scloadingScreen->setProgress(progress);
+        // Loading complete, switch to main screen
+        if (progress >= 1.0f) {
+            app->scloadingScreen->removeAllElements();
+            if (app->isUserPage_) {
+                // Skip UserSelect screen if launched via user page
+                app->setScreen(app->config_->lScreen());
+            } else {
+                // Start with UserSelect screen
+                app->window->setFadeIn(true);
+                app->window->setFadeOut(true);
+                app->setScreen(ScreenID::UserSelect);
+            }
         }
     }
 
@@ -125,6 +167,7 @@ namespace Main {
     }
 
     void Application::createScreens() {
+        this->scloadingScreen = new Screen::LoadingScreen(this);
         this->scAdjustPlaytime = new Screen::AdjustPlaytime(this);
         this->scAllActivity = new Screen::AllActivity(this);
         this->scCustomTheme = new Screen::CustomTheme(this);
@@ -143,6 +186,7 @@ namespace Main {
     }
 
     void Application::deleteScreens() {
+        delete this->scloadingScreen;
         delete this->scAdjustPlaytime;
         delete this->scAllActivity;
         delete this->scCustomTheme;
@@ -167,6 +211,10 @@ namespace Main {
 
     void Application::setScreen(ScreenID s) {
         switch (s) {
+            case LoadingScreen:
+                this->window->showScreen(this->scloadingScreen);
+                this->screen = LoadingScreen;
+                break;
             case AdjustPlaytime:
                 this->window->showScreen(this->scAdjustPlaytime);
                 this->screen = AdjustPlaytime;
@@ -471,6 +519,8 @@ namespace Main {
     }
 
     Application::~Application() {
+        threadWaitForExit(&this->initThreadHandle);
+
         // Delete user objects
         while (users.size() > 0) {
             delete users[0];
@@ -507,6 +557,8 @@ namespace Main {
 
         // Install update if present
         Utils::Update::install();
+
+        threadClose(&this->initThreadHandle);
 
         if (this->isUserPage_) {
             appletRequestExitToSelf();

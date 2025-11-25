@@ -3,7 +3,7 @@
 #include <iterator>
 
 // Maximum number of titles to read using pdm
-#define MAX_TITLES 4096
+#define MAX_TITLES 32768
 
 // Comparison of AccountUids
 bool operator == (const AccountUid &a, const AccountUid &b) {
@@ -136,7 +136,7 @@ namespace Utils::NX {
         if (R_SUCCEEDED(rc)) {
             // Create objects and insert into vector
             for (s32 i = 0; i < num; i++) {
-                users.push_back(new ::NX::User(userIDs[i]));
+                users.emplace_back(new ::NX::User(userIDs[i]));
             }
         }
 
@@ -172,7 +172,7 @@ namespace Utils::NX {
                         tmpID = (static_cast<TitleID>(userPlayEvents[i].application_id[0]) << 32) | userPlayEvents[i].application_id[1];
                         if (std::find_if(playedIDs.begin(), playedIDs.end(), [tmpID](auto id){ return (id == tmpID); }) == playedIDs.end()) {
                             if (tmpID != 0) {
-                                playedIDs.push_back(tmpID);
+                                playedIDs.emplace_back(tmpID);
                             }
                         }
                     }
@@ -197,7 +197,7 @@ namespace Utils::NX {
             }
             for (s32 i = 0; i < out; i++) {
                 if ((records + i)->application_id != 0) {
-                    installedIDs.push_back((records + i)->application_id);
+                    installedIDs.emplace_back((records + i)->application_id);
                 }
             }
             count += out;
@@ -209,7 +209,7 @@ namespace Utils::NX {
         for (auto playedID : playedIDs) {
             // Loop over installed titles to determine if installed or not
             bool installed = std::find_if(installedIDs.begin(), installedIDs.end(), [playedID](auto id) { return id == playedID; }) != installedIDs.end();
-            titles.push_back(new ::NX::Title(playedID, installed));
+            titles.emplace_back(new ::NX::Title(playedID, installed));
         }
 
         return titles;

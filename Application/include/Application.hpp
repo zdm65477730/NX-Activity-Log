@@ -11,6 +11,7 @@
 #include "utils/Time.hpp"
 
 namespace Screen {
+    class LoadingScreen;
     class AdjustPlaytime;
     class AllActivity;
     class CustomTheme;
@@ -41,6 +42,7 @@ namespace Main {
             Aether::Window * window;
 
             // Screens of the app
+            Screen::LoadingScreen * scloadingScreen;
             Screen::AdjustPlaytime * scAdjustPlaytime;
             Screen::AllActivity * scAllActivity;
             Screen::CustomTheme * scCustomTheme;
@@ -78,6 +80,9 @@ namespace Main {
             std::future<void> updateThread;
             // Function to check for update
             void checkForUpdate();
+
+            Thread initThreadHandle;
+            static void initThreadFunc(void* arg);
 
             // Time to view recent activity, etc...
             struct tm tm;

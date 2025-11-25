@@ -36,6 +36,7 @@ enum class ScreenCreate {
 
 // Enumeration for screens (allows for easy switching)
 enum ScreenID {
+    LoadingScreen,
     UserSelect,
     AllActivity,
     RecentActivity,
