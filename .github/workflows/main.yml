@@ -15,7 +15,7 @@ jobs:
       - name: Update latest libnx
         run: |
           git config --global --add safe.directory "*"
-          git clone --recurse-submodules https://github.com/zdm65477730/libnx.git
+          git clone --recurse-submodules https://github.com/switchbrew/libnx.git
           cd libnx
           make install -j$(nproc)
         shell: bash
