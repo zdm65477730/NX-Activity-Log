@@ -1,4 +1,5 @@
 #include "Application.ExportJob.hpp"
+#include <filesystem>
 #include <fstream>
 #include "nlohmann/json.hpp"
 #include "utils/Utils.hpp"
@@ -114,8 +115,12 @@ namespace Main {
         }
 
         // Write to file
+        std::filesystem::create_directories("/switch/NX-Activity-Log");
         std::ofstream file("/switch/NX-Activity-Log/export.json");
-        file << json.dump(4) << std::endl;
+        if (file.is_open()) {
+            file << json.dump(4) << std::endl;
+            file.close();
+        }
 
         // Pause so those with little data can still see the process completed successfully
         this->percent = 99.9;

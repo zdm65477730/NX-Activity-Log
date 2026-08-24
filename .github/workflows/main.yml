@@ -1,15 +1,16 @@
 name: Release
 
 on:
-  issue_comment:
-    types: [ created ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build_and_release:
     name: Build and release
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:latest
-    if: contains(github.event.comment.body, '/release-action')
 
     steps:
       - name: Update latest libnx

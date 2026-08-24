@@ -42,8 +42,8 @@ FORWARDER	:=	$(ROMFS)/exefs.nsp
 # Application version
 #---------------------------------------------------------------------------------
 VER_MAJOR	:= 1
-VER_MINOR	:= 5
-VER_MICRO	:= 8
+VER_MINOR	:= 6
+VER_MICRO	:= 1
 
 #---------------------------------------------------------------------------------
 # Options for .nacp information
@@ -70,7 +70,7 @@ OUTPUT		:=	$(CURDIR)/$(TARGET)
 #---------------------------------------------------------------------------------
 # Flags to pass to compiler
 #---------------------------------------------------------------------------------
-DEFINES		:=	-D__SWITCH__ -DVER_MAJOR=$(VER_MAJOR) -DVER_MINOR=$(VER_MINOR) -DVER_MICRO=$(VER_MICRO) -DVER_STRING=\"$(VER_MAJOR).$(VER_MINOR).$(VER_MICRO)\"
+DEFINES		:=	-D__SWITCH__ -DJSON_NOEXCEPTION -DVER_MAJOR=$(VER_MAJOR) -DVER_MINOR=$(VER_MINOR) -DVER_MICRO=$(VER_MICRO) -DVER_STRING=\"$(VER_MAJOR).$(VER_MINOR).$(VER_MICRO)\"
 CFLAGS		:=	-g -Wall -O2 -ffunction-sections $(ARCH) $(DEFINES) $(INCLUDE)
 CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions -std=c++23
 

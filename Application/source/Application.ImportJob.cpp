@@ -21,7 +21,15 @@ namespace Main {
             return;
         }
         std::ifstream importFile("/switch/NX-Activity-Log/import.json");
-        nlohmann::json importJson = nlohmann::json::parse(importFile);
+        if (!importFile.is_open()) {
+            this->percent = 100;
+            return;
+        }
+        nlohmann::json importJson = nlohmann::json::parse(importFile, nullptr, false);
+        if (importJson.is_discarded()) {
+            this->percent = 100;
+            return;
+        }
 
         // Create imported JSON
         nlohmann::json json;
@@ -155,8 +163,12 @@ namespace Main {
         }
 
         // Write imported data to file
+        std::filesystem::create_directories("/switch/NX-Activity-Log");
         std::ofstream importedFile("/switch/NX-Activity-Log/importedData.json");
-        importedFile << json.dump(4) << std::endl;
+        if (importedFile.is_open()) {
+            importedFile << json.dump(4) << std::endl;
+            importedFile.close();
+        }
 
         // Pause so those with little data can still see the process completed successfully
         this->percent = 99.9;

@@ -97,11 +97,10 @@ namespace NX {
 
         // Iterate over valid sessions to calculate statistics
         for (size_t i = 0; i < sessions.size(); i++) {
-            stats->launches++;
+            u64 prev_playtime = stats->playtime;
 
             u64 last_ts = 0;
             u64 last_clock = 0;
-            bool in_before = false;
             bool done = false;
             for (size_t j = sessions[i].index; j < sessions[i].index + sessions[i].num; j++) {
                 if (done) {
@@ -126,25 +125,23 @@ namespace NX {
                     case Applet_InFocus:
                         last_ts = this->events[j]->steadyTimestamp;
                         last_clock = this->events[j]->clockTimestamp;
-                        in_before = false;
-                        if (this->events[j]->clockTimestamp < start_ts) {
-                            last_clock = start_ts;
-                            in_before = true;
-                        } else if (this->events[j]->clockTimestamp >= end_ts) {
+                        if (this->events[j]->clockTimestamp >= end_ts) {
                             done = true;
                         }
                         break;
 
-                    case Applet_OutFocus:
-                        if (this->events[j]->clockTimestamp >= end_ts) {
-                            stats->playtime += (end_ts - last_clock);
-                        } else if (this->events[j]->clockTimestamp >= start_ts) {
-                            if (in_before) {
-                                stats->playtime += (this->events[j]->clockTimestamp - last_clock);
-                            } else {
-                                stats->playtime += (this->events[j]->steadyTimestamp - last_ts);
-                            }
+                    case Applet_OutFocus: {
+                        u64 steady_diff = this->events[j]->steadyTimestamp - last_ts;
+                        u64 active_start = last_clock;
+                        u64 active_end = active_start + steady_diff;
+
+                        u64 overlap_start = (active_start > start_ts) ? active_start : start_ts;
+                        u64 overlap_end = (active_end < end_ts) ? active_end : end_ts;
+
+                        if (overlap_end > overlap_start) {
+                            stats->playtime += (overlap_end - overlap_start);
                         }
+                    }
 
                         // Move to last out focus (I don't know why the log has multiple)
                         while (j+1 < this->events.size()) {
@@ -156,6 +153,11 @@ namespace NX {
                         }
                         break;
                 }
+            }
+
+            if ((this->events[sessions[i].index]->clockTimestamp >= start_ts && this->events[sessions[i].index]->clockTimestamp < end_ts) || 
+                (stats->playtime > prev_playtime)) {
+                stats->launches++;
             }
         }
 
@@ -286,7 +288,10 @@ namespace NX {
 
         // Read in file
         std::ifstream file("/switch/NX-Activity-Log/importedData.json");
-        nlohmann::json json = nlohmann::json::parse(file);
+        nlohmann::json json = nlohmann::json::parse(file, nullptr, false);
+        if (json.is_discarded()) {
+            return ret;
+        }
         if (json["users"] == nullptr || json["importTimestamp"] == nullptr) {
             return ret;
         }
@@ -530,19 +535,24 @@ namespace NX {
         PdmPlayStatistics tmp;
         pdmqryQueryPlayStatisticsByApplicationIdAndUserAccountId(titleID, userID, false, &tmp);
         PlayStatistics * stats = new PlayStatistics;
-        if (tmp.first_timestamp_user != 0 && tmp.last_timestamp_user != 0) {
-            stats->firstPlayed = tmp.first_timestamp_user;
-            stats->lastPlayed = tmp.last_timestamp_user;
-        } else {
-            auto it = std::find_if(this->summaries.begin(), this->summaries.end(), [titleID](auto s){ return (s->titleID == titleID); });
-            if (it != this->summaries.end()) {
-                stats->firstPlayed = (*it)->firstPlayed;
-                stats->lastPlayed = (*it)->lastPlayed;
-            }
-        }
-
+        stats->firstPlayed = tmp.first_timestamp_user;
+        stats->lastPlayed = tmp.last_timestamp_user;
         stats->playtime = tmp.playtime / 1000 / 1000 / 1000; //the unit of playtime in PdmPlayStatistics is ns
         stats->launches = tmp.total_launches;
+
+        auto it = std::find_if(this->summaries.begin(), this->summaries.end(), [titleID](auto s){ return (s->titleID == titleID); });
+        if (it != this->summaries.end()) {
+            if ((*it)->playtime > stats->playtime) {
+                stats->playtime = (*it)->playtime;
+                stats->launches = (*it)->launches;
+                if ((*it)->firstPlayed < stats->firstPlayed || stats->firstPlayed == 0) {
+                    stats->firstPlayed = (*it)->firstPlayed;
+                }
+                if ((*it)->lastPlayed > stats->lastPlayed) {
+                    stats->lastPlayed = (*it)->lastPlayed;
+                }
+            }
+        }
         return stats;
     }
 
